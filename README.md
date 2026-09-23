@@ -1,0 +1,441 @@
+# Lunar Cross-Sensor Image Registration
+
+**A hybrid detector-free + radiation-invariant pipeline for co-registering Chandrayaan-2 and LRO optical imagery in South Polar Stereographic space.**
+
+![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![PyTorch](https://img.shields.io/badge/PyTorch-GPU-ee4c2c)
+![OpenCV](https://img.shields.io/badge/OpenCV-%E2%89%A54.5-5c3ee8)
+![Smart India Hackathon](https://img.shields.io/badge/Smart%20India%20Hackathon-National%20Screening-orange)
+
+> Problem Statement ID: `<SIHxxxx>` · Team: `<team name>`
+
+---
+
+## Table of Contents
+
+1. [Overview](#1-overview)
+2. [Highlights](#2-highlights)
+3. [System Architecture](#3-system-architecture)
+4. [Stage-by-Stage Technical Detail](#4-stage-by-stage-technical-detail)
+5. [Coordinate Frame Conventions](#5-coordinate-frame-conventions)
+6. [Repository Structure](#6-repository-structure)
+7. [Installation](#7-installation)
+8. [Usage](#8-usage)
+9. [Configuration Reference](#9-configuration-reference)
+10. [Outputs](#10-outputs)
+11. [Evaluation Metrics](#11-evaluation-metrics)
+12. [Design Rationale](#12-design-rationale)
+13. [Known Issues & Limitations](#13-known-issues--limitations)
+14. [Roadmap](#14-roadmap)
+15. [References](#15-references)
+
+---
+
+## 1. Overview
+
+Lunar polar imagery comes from many instruments with very different radiometry, geometry and resolution: ISRO's Chandrayaan-2 **TMC** and **OHRC** cameras and **IIRS** imaging spectrometer (distributed as unprojected PDS3/XML products), and NASA's **LRO** GeoTIFFs. Registering them against one another is hard because:
+
+- **Non-linear radiometric differences.** Different sensors, spectral bands, and solar geometry produce intensity relationships that classical gradient/SIFT-style descriptors do not survive.
+- **Extreme illumination.** At the poles the sun sits at grazing angles, so shadows move drastically between acquisitions and dominate local appearance.
+- **Heterogeneous georeferencing.** Some products carry an affine transform, others only four lat/lon corner coordinates.
+- **Resolution mismatch** between sensors (m/px) and large scene sizes that do not fit on a GPU in one shot.
+
+This repository implements a **10-stage, fully in-memory pipeline** that takes two raw products, computes their geographic overlap, resamples both onto a shared metric grid, extracts correspondences using **two complementary matchers run in parallel (LoFTR and RIFT-2)**, fuses them with solar-incidence-aware weighting, verifies them geometrically with **MAGSAC** (global and piecewise), refines the inliers to sub-pixel precision, and emits warped rasters, overlays, tie-point files and diagnostics.
+
+---
+
+## 2. Highlights
+
+- **Dual-branch matching.** A learned transformer matcher (LoFTR) and a hand-crafted phase-congruency matcher (RIFT-2) run on the *same* macro-patch, with results expressed in the same coordinate frame.
+- **GPU-vectorised phase congruency.** RIFT-2's log-Gabor bank (4 scales × 6 orientations) is re-implemented in PyTorch with FFT-domain filtering (`phasecong_gpu.py`).
+- **Macro/micro patching.** RIFT-2 sees 1024×1024 macro-patches for stable orientation histograms; LoFTR internally tiles them into 512×512 micro-patches to bound VRAM, then re-stitches into the macro frame, so downstream code never sees the split.
+- **Solar-incidence-aware fusion.** Branch confidences are re-weighted by sun incidence angle (RIFT-2 favoured at grazing light, LoFTR at flatter light).
+- **Two geometric models, both reported.** A single global homography, and a **piecewise per-tile homography with feathered blending** for terrain relief/parallax that one homography cannot represent.
+- **Spatial-uniformity enforcement.** Grid-based match capping (and grid NMS inside RIFT-2) prevents crater rims from dominating the correspondence set.
+- **Unified metadata handling.** Works from ISRO PDS3/XML labels (corner-only) or georeferenced LRO GeoTIFFs via one dispatch function.
+- **IIRS support.** Hyperspectral cubes are collapsed to a pseudo-panchromatic band (mean of bands 40–60) and warped to the shared grid.
+
+---
+
+## 3. System Architecture
+
+```mermaid
+flowchart LR
+    A["Raw products<br/>ISRO XML (TMC/OHRC/IIRS)<br/>LRO GeoTIFF"] --> B["1 Metadata Parser"]
+    B --> C["2 Intersection Calculator<br/>(South Polar Stereographic)"]
+    C --> D["3 Geo-Sampler<br/>(shared metric grid)"]
+    D --> E["4 Preprocessor<br/>log → normalise → masked CLAHE"]
+    E --> F["5 Patch Extractor<br/>1024² macro-patches, stride 512"]
+    F --> G1["6a RIFT-2<br/>whole 1024² patch"]
+    F --> G2["6b LoFTR<br/>4 × 512² quadrants"]
+    G1 --> H["7 Match Fusion<br/>solar-weighted + grid cap"]
+    G2 --> H
+    H --> I["8 MAGSAC Verification<br/>global + piecewise"]
+    I --> J["9 Sub-pixel Refinement"]
+    J --> K["10 Visualisation<br/>+ summary.json"]
+```
+
+| # | Stage | Module | Responsibility |
+|---|-------|--------|----------------|
+| 1 | Metadata Parser | `metadata.py` | Corner lat/lon + resolution from XML or GeoTIFF |
+| 2 | Intersection Calculator | `geometry.py` | Footprint intersection, per-image pixel windows, shared output shape |
+| 3 | Geo-Sampler | `geosampler.py` | Windowed read (TIF) / homography warp (XML) onto the shared grid |
+| 4 | Optical Preprocessor | `preprocess.py` | Log transform, robust 8-bit stretch, masked CLAHE |
+| 5 | Patch Extractor | `patches.py` | Overlapping macro-patches with no-data / low-contrast QC |
+| 6 | Feature Extractors | `features.py`, `RIFT2.py`, `phasecong_gpu.py` | LoFTR and RIFT-2 candidate matches |
+| 7 | Match Fusion | `fusion.py` | Weighting, tile→global coordinates, uniform density cap |
+| 8 | RANSAC Filter | `ransac_filter.py` | Global and piecewise MAGSAC homographies, RMSE, blended warp |
+| 9 | Sub-pixel Alignment | `subpixel.py` | `cornerSubPix` refinement of inliers |
+| 10 | Visualisation | `visualize.py` | Tie-line rendering |
+
+Everything between stages is passed **in memory**; only final deliverables are written to disk.
+
+---
+
+## 4. Stage-by-Stage Technical Detail
+
+### 4.1 Metadata Parser (`metadata.py`)
+
+`parse_metadata(path)` dispatches on extension and returns `(corners, resolution_m_per_px, product_type)`.
+
+- **`.xml` (ISRO PDS3).** Corner lat/lon are read via namespace-agnostic tag matching (`upper_left_latitude`, …) and `pixel_resolution` gives m/px.
+- **`.tif` / `.tiff` (LRO).** Bounds are reprojected from the raster CRS to a lunar geographic CRS (`+proj=latlong +R=1737400 +no_defs`) with `rasterio.warp.transform_bounds`; resolution comes from `src.res`.
+
+### 4.2 Intersection Calculator (`geometry.py`)
+
+Each footprint is mapped to **South Polar Stereographic** metres on a sphere of radius $R = 1{,}737{,}400\ \mathrm{m}$:
+
+$$\rho = 2R\tan\!\left(\frac{\pi}{4} + \frac{\varphi}{2}\right),\qquad x = \rho\sin\lambda,\qquad y = \rho\cos\lambda$$
+
+with the inverse $\varphi = 2\arctan\!\left(\frac{\rho}{2R}\right) - \frac{\pi}{2}$, $\lambda = \operatorname{atan2}(x, y) \bmod 360^\circ$.
+
+The two footprints become Shapely polygons and are intersected. The intersection is then projected **independently back into each image's pixel space**:
+
+- **GeoTIFF:** through the inverse affine transform (`~transform`).
+- **XML (no transform):** through a 4-point perspective transform (`cv2.getPerspectiveTransform`) from stereographic metres of the corners to pixel corners.
+
+Windows are clamped to image bounds. The shared target resolution is the **coarser** of the two sensors, and the shared grid size follows from the intersection's metric extent:
+
+$$W = \left\lfloor \frac{x_{max} - x_{min}}{r_{target}} \right\rfloor,\quad H = \left\lfloor \frac{y_{max} - y_{min}}{r_{target}} \right\rfloor,\quad r_{target} = \max(r_1, r_2)$$
+
+### 4.3 Geo-Sampler (`geosampler.py`)
+
+- **`sample_overlap`** (GeoTIFF): a windowed `rasterio` read with `out_shape` set to the shared grid, so resampling happens *during* I/O and the full raster is never materialised.
+- **`sample_unprojected_xml`** (TMC/OHRC/IIRS): loads the raw band, computes a perspective homography from the raw pixel corners to the four corners' positions on the shared metric grid, and applies `cv2.warpPerspective`. For **IIRS**, bands 40–60 are averaged into a pseudo-panchromatic image and lightly Gaussian-smoothed (5×5) to suppress spectral noise.
+
+### 4.4 Optical Preprocessor (`preprocess.py`)
+
+1. **Log transform** `log1p` on valid (>0) pixels, compressing the very large dynamic range of polar imagery.
+2. **Robust normalisation.** Drop everything below the 3rd percentile of valid pixels (noise floor), then min–max stretch to `uint8`.
+3. **Masked CLAHE** (clip limit 2.0, 8×8 tiles); the original no-data mask is re-applied so CLAHE cannot invent signal in empty regions.
+
+### 4.5 Patch Extractor (`patches.py`)
+
+A generator yielding 1024×1024 macro-patch pairs (default stride 512 → 50 % overlap), rejecting a pair if either image:
+
+- has more than `max_black_fraction` of pixels below intensity 25 (0.80 in the pipeline, to tolerate diagonal pushbroom strips), or
+- has a standard deviation below `min_std = 15` (flat, feature-poor terrain).
+
+### 4.6 Feature Extractors
+
+Both runners consume the same CLAHE-enhanced `uint8` macro-patch pair and return `(pts_ref, pts_src, conf)` in the **1024×1024 macro-patch frame**.
+
+#### LoFTR branch (`features.LoFTRRunner`)
+
+- Weights loaded once (`outdoor_ds.ckpt`), `strict=False` state-dict load.
+- Each macro-patch is split into four 512×512 quadrants (`QUADRANT_OFFSETS`); quadrants with < 10 % non-zero reference pixels are skipped.
+- Per quadrant: inputs are scaled to `[0, 1]`, LoFTR returns `mkpts0_f`, `mkpts1_f`, `mconf`; matches with `conf ≤ conf_thresh` (0.3 in the pipeline) are dropped.
+- Local coordinates are shifted by the quadrant offset `(x_off, y_off)` and concatenated.
+
+#### RIFT-2 branch (`RIFT2.py`, `phasecong_gpu.py`)
+
+**Detection.** A log-Gabor filter bank is applied in the Fourier domain on GPU. For scale $s \in \{0..3\}$ the centre wavelength is $\lambda_s = 3 \cdot 1.6^{s}$ px, and the radial response is
+
+$$G(r) = \exp\!\left(-\frac{\ln^2(r/f_0)}{2\ln^2\sigma_{on/f}}\right),\quad \sigma_{on/f} = 0.75,\ f_0 = 1/\lambda_s$$
+
+multiplied by an angular Gaussian spread for each of 6 orientations. Per orientation, phase congruency is
+
+$$PC_o(x) = \frac{\max\left(\left\|\sum_s E_{o,s}(x)\right\| - T,\ 0\right)}{\sum_s A_{o,s}(x) + \epsilon}$$
+
+The 6 orientation maps are combined through moment analysis; the **minimum moment** $m$ (a corner-strength map) is normalised to 8-bit and passed to **FAST** (threshold 1, NMS). Keypoints then go through **grid NMS** (4×4 cells, top-30 by response per cell) to force spatial spread.
+
+**Orientation.** A 24-bin, Gaussian-weighted gradient-orientation histogram over an elliptical 96-px window is computed on the $m$ map; every peak above 0.8 × max spawns a keypoint (multi-orientation).
+
+**Description.** From the same filter responses, the **Maximum Index Map (MIM)** is built: for each orientation $j$, amplitudes are summed over the 4 scales, and MIM is the arg-max orientation index per pixel. For each oriented keypoint, a 96×96 MIM patch is sampled, rotated by the keypoint orientation, and its dominant MIM index is cyclically shifted to zero (the RIFT-2 rotation-invariance trick). The patch is divided into a 6×6 grid, each cell contributes a 6-bin index histogram, giving a **216-D** L2-normalised descriptor. Descriptors are computed in parallel with `joblib`.
+
+**Matching.** `match_keypoints_nn`: brute-force L2 kNN (k=2), **Lowe ratio 0.90**, **mutual consistency** (a match must survive the ratio test in both directions). Confidence is `1 − d₁/d₂`.
+
+### 4.7 Match Fusion (`fusion.py`)
+
+**Coordinate lift.** Tile-local `(x, y)` points are shifted by the macro-patch origin into the shared overlap-grid frame, so every later stage operates in one coordinate system. Each point keeps a `source` label (`"rift"` / `"loftr"`) for diagnostics.
+
+**Solar-incidence weighting.**
+
+| Solar incidence | RIFT-2 weight | LoFTR weight | Rationale |
+|-----------------|:-------------:|:------------:|-----------|
+| > 70° (grazing) | 1.2 | 0.7 | Phase congruency is robust to shadow-dominated, low-contrast structure |
+| 40° – 70° | 1.0 | 1.0 | Neutral |
+| < 40° (high sun) | 0.8 | 1.1 | Flatter lighting favours learned appearance features |
+
+**LoFTR capper.** In the pipeline, all RIFT-2 matches for a tile are kept but LoFTR is limited to its top-80 by confidence to suppress noisy dense matches.
+
+**Uniform density (`enforce_uniform_distribution`).** Reference-image points are binned into a 10×10 grid over the overlap; each cell keeps at most 15 matches by confidence, and grid coverage is logged. This is what the **global** fit consumes; the **piecewise** fit uses the per-tile sets pre-cap.
+
+### 4.8 Geometric Verification (`ransac_filter.py`)
+
+Both strategies are computed and reported so they can be compared directly. Homographies map **source → reference**.
+
+**Global.** Matches with `conf > 0.20` go to `cv2.findHomography(..., cv2.USAC_MAGSAC, 3.3 px, maxIters=50000, confidence=0.999)`. The full source is warped into the reference frame, and a diagnostic overlay is written (green channel = reference, red = aligned source, so misregistration shows as colour fringing).
+
+**Piecewise.** One MAGSAC homography per macro-patch (`≥ 10` matches, 5 px threshold), with sanity gating on the linear part:
+
+$$0.1 \le \det(H_{[0:2,0:2]}) \le 10$$
+
+and a minimum inlier ratio (0.02 in the pipeline). Tiles are stitched by **feathered blending**:
+
+$$I(p) = \frac{\sum_t w_t(p)\, I_t(p)}{\sum_t w_t(p)},\qquad w_t = \mathbf{r} \otimes \mathbf{r}$$
+
+where $\mathbf{r}$ is a 1024-sample ramp with 48-px linear feathering at both ends. This tolerates local terrain relief and pushbroom distortions that a single projective model cannot represent. Per-tile logs break out inliers by origin (`RIFT2: n | LoFTR: m`), which is useful for ablations.
+
+### 4.9 Sub-Pixel Alignment (`subpixel.py`)
+
+Piecewise inliers are refined with `cv2.cornerSubPix` (5×5 window, ≤ 40 iterations, ε = 10⁻³) independently in each image, using the local gradient structure, and saved to `subpixel_inliers.npz`.
+
+### 4.10 Visualisation (`visualize.py`)
+
+Reference and source are downscaled (10 %), placed side by side with a separator, and inlier correspondences are drawn as green tie-lines with yellow endpoints. A banner reports total points, inliers and inlier ratio. Rendering is capped at 8000 lines.
+
+---
+
+## 5. Coordinate Frame Conventions
+
+| Frame | Origin / unit | Where used |
+|-------|---------------|------------|
+| Geographic | lat/lon on sphere R = 1737.4 km | Metadata |
+| South Polar Stereographic | Pole = (0, 0), metres | Footprint intersection |
+| **Shared overlap grid** | Top-left of intersection bbox, pixel = `target_res` m | Everything from Stage 3 onward |
+| Macro-patch | `(0,0)` = patch top-left, 1024×1024 | Stages 6 outputs |
+| LoFTR quadrant | 512×512 local | Internal to `LoFTRRunner` only |
+
+Point arrays are always `(x, y)` = `(col, row)`; patch offsets are `(y_off, x_off)`. Tile → grid: `pts_global = pts_tile + [x_off, y_off]`.
+
+---
+
+## 6. Repository Structure
+
+```
+.
+├── run_pipeline.py        # Master orchestrator + CLI
+├── metadata.py            # Stage 1  – XML / GeoTIFF corner + resolution parsing
+├── geometry.py            # Stage 2  – stereographic projection, footprint intersection
+├── geosampler.py          # Stage 3  – windowed reads / perspective warps to shared grid
+├── preprocess.py          # Stage 4  – log → normalise → masked CLAHE
+├── patches.py             # Stage 5  – macro-patch generator with QC filters
+├── features.py            # Stage 6  – LoFTRRunner, RIFT2Runner
+├── RIFT2.py               #            RIFT-2 detector / orientation / descriptor
+├── phasecong_gpu.py       #            PyTorch log-Gabor phase congruency
+├── matcher_functions.py   #            mutual-NN + Lowe matcher, MAGSAC helper, drawing
+├── fusion.py              # Stage 7  – solar weighting, coordinate lift, density cap
+├── ransac_filter.py       # Stage 8  – global + piecewise MAGSAC, blended warp
+├── subpixel.py            # Stage 9  – cornerSubPix refinement
+├── visualize.py           # Stage 10 – tie-line visualisation (+ debug entrypoint)
+└── LoFTR/                 # (external) zju3dv/LoFTR clone with weights
+```
+
+---
+
+## 7. Installation
+
+**Requirements:** Python ≥ 3.9, a CUDA-capable GPU (strongly recommended; both branches fall back to CPU but are slow), OpenCV ≥ 4.5 (needed for `cv2.USAC_MAGSAC`).
+
+```bash
+git clone <this-repo> && cd <this-repo>
+
+conda create -n lunar-reg python=3.10 -y
+conda activate lunar-reg
+
+# rasterio/GDAL and shapely are easiest via conda-forge
+conda install -c conda-forge rasterio shapely -y
+
+pip install torch torchvision                  # pick the CUDA build for your system
+pip install numpy opencv-python pyyaml joblib tqdm matplotlib
+
+# LoFTR (external dependency, cloned next to run_pipeline.py)
+git clone https://github.com/zju3dv/LoFTR.git
+# install LoFTR's own dependencies (see LoFTR/environment.yaml), then place the
+# outdoor checkpoint at:
+#   ./LoFTR/weights/outdoor_ds.ckpt
+```
+
+---
+
+## 8. Usage
+
+### CLI
+
+```bash
+python run_pipeline.py \
+    --ref Raw/M1195313832LE_stereo.tif \
+    --src Raw/ch2_ohr_ncp_<...>_d_img_d18.xml \
+    --out-dir output
+```
+
+| Flag | Description |
+|------|-------------|
+| `--ref` | Reference product (`.xml` or `.tif`) |
+| `--src` | Source product to be registered onto the reference (`.xml` or `.tif`) |
+| `--out-dir` | Output directory |
+| `--is-iirs` | Treat the source XML as an IIRS cube (band 40–60 mean) |
+
+### Python API
+
+```python
+from run_pipeline import run_pipeline
+
+summary = run_pipeline(
+    ref_path="Raw/ref.tif",
+    src_path="Raw/src.xml",
+    loftr_repo_dir="./LoFTR",
+    loftr_weights="./LoFTR/weights/outdoor_ds.ckpt",
+    out_dir="output",
+    patch_size=1024, stride=512,
+    solar_incidence_deg=69.0,
+    use_piecewise=True,
+    loftr_conf_thresh=0.3,
+    grid_cap_per_cell=15,
+    is_iirs=False,
+)
+```
+
+### Re-running verification from cached matches
+
+`visualize.py` contains a debug entrypoint that reloads `reference_clahe.png`, `source_clahe.png` and `fused_matches.npz` from `output/` and reruns global RANSAC + rendering in seconds, skipping the expensive feature-extraction stage.
+
+---
+
+## 9. Configuration Reference
+
+| Parameter | Default (pipeline) | Location | Effect |
+|-----------|--------------------|----------|--------|
+| `patch_size` / `stride` | 1024 / 512 | `run_pipeline` | Macro-patch size / overlap |
+| `max_black_fraction` | 0.80 (px < 25) | `patches.py` | No-data tolerance |
+| `min_std` | 15 | `patches.py` | Low-contrast rejection |
+| CLAHE `clip_limit`, `tile_grid` | 2.0, 8×8 | `preprocess.py` | Local contrast |
+| Noise-floor percentile | 3 | `preprocess.py` | Dark-pixel clipping |
+| `micro_patch_size` | 512 | `LoFTRRunner` | LoFTR VRAM bound |
+| `loftr_conf_thresh` | 0.3 | `run_pipeline` | LoFTR confidence cut |
+| LoFTR cap per tile | 80 | `run_pipeline` | Noise limiter |
+| `nscale`, `norient` | 4, 6 | `RIFT2` | Log-Gabor bank |
+| `minWaveLength`, `mult`, `sigmaOnf` | 3, 1.6, 0.75 | `RIFT2` | Filter design |
+| `patch_size`, `no`, `nbin` (descriptor) | 96, 6, 6 | `RIFT2` | 216-D descriptor |
+| `ori_peak_ratio` | 0.8 | `RIFT2` | Multi-orientation keypoints |
+| Grid NMS | 4×4, 30/cell | `RIFT2.py` | Keypoint spatial spread |
+| `lowes_ratio` | 0.90, mutual | `RIFT2Runner` | Descriptor matching |
+| `solar_incidence_deg` | 69.0 | `run_pipeline` | Branch weighting |
+| Density cap | 10×10 grid, 15/cell | `fusion.py` | Spatial uniformity |
+| Global: conf / MAGSAC threshold | 0.20 / 3.3 px | `ransac_filter.py` | Global homography |
+| Piecewise: conf / MAGSAC threshold | 0.05 / 5.0 px | `ransac_filter.py` | Per-tile homography |
+| Piecewise min inlier ratio | 0.02 | `run_pipeline` | Tile acceptance |
+| Feather width | 48 px | `ransac_filter.py` | Tile blending |
+| `cornerSubPix` | 5×5 win, 40 it, ε = 1e-3 | `subpixel.py` | Sub-pixel refinement |
+
+---
+
+## 10. Outputs
+
+All written to `--out-dir`:
+
+| File | Content |
+|------|---------|
+| `reference_clahe.png`, `source_clahe.png` | Preprocessed images on the shared grid |
+| `fused_matches.npz` | `pts1`, `pts2`, `conf` after fusion + density cap |
+| `global_warped.png`, `global_overlay.png` | Global-homography result; green/red overlay |
+| `piecewise_warped.png` | Feather-blended piecewise result |
+| `subpixel_inliers.npz` | Sub-pixel-refined `pts_ref`, `pts_src` (piecewise inliers) |
+| `piecewise_visualization.png` | Tie-line figure (falls back to `global_visualization.png`) |
+| `summary.json` | Run metrics (below) |
+
+```jsonc
+{
+  "elapsed_sec": <float>,
+  "candidate_matches_after_capping": <int>,
+  "global":    { "inlier_count": <int>, "total_tested": <int>, "inlier_ratio": <float>, "rmse": <float> },
+  "piecewise": { "tiles_used": <int>, "avg_tile_inlier_ratio": <float>, "median_tile_inlier_ratio": <float>,
+                 "avg_tile_rmse": <float>, "median_tile_rmse": <float> }
+}
+```
+
+---
+
+## 11. Evaluation Metrics
+
+- **Inlier ratio** = MAGSAC inliers / matches tested. A proxy for correspondence quality and model consistency.
+- **RMSE (px)** = $\sqrt{\frac{1}{N}\sum_i \lVert H\,\mathbf{x}^{src}_i - \mathbf{x}^{ref}_i \rVert^2}$ over **inliers only**. Because it is computed on inliers, it reflects fit tightness and should be read together with the inlier ratio and the visual overlay. Multiply by `target_res` for metres.
+- **Per-source inlier breakdown** (RIFT-2 vs LoFTR) per tile, for ablation of the fusion strategy.
+- **Visual check:** the red/green overlay and tie-line figures.
+
+### Results
+
+| Scene pair | Sensors | Global inliers / RMSE | Piecewise tiles / median RMSE |
+|------------|---------|-----------------------|-------------------------------|
+| `<fill in>` | `<e.g. LRO NAC ↔ OHRC>` | `<…>` | `<…>` |
+
+> Add representative `*_overlay.png` and `piecewise_visualization.png` figures here.
+
+---
+
+## 12. Design Rationale
+
+- **Why two matchers?** LoFTR is strong when appearance is broadly consistent but is trained on terrestrial imagery and is sensitive to the extreme shadowing seen at lunar poles. RIFT-2 is built on phase congruency and MIM descriptors, which are designed for non-linear radiometric differences between modalities. Running both on the same patch and fusing them exploits their complementary failure modes.
+- **Why macro/micro patches?** Orientation-histogram descriptors need spatial context (1024²), while transformer attention memory grows quickly with resolution (512² quadrants). Re-stitching inside `LoFTRRunner` keeps the contract identical for both runners.
+- **Why phase congruency on GPU?** Filtering 24 (scale × orientation) responses per 1024² patch is FFT-bound; batching it on the GPU removes the dominant CPU bottleneck of the reference implementation.
+- **Why both global and piecewise?** A single homography is a good model only for near-planar scenes; crater relief and pushbroom geometry violate it. Reporting both makes the trade-off explicit.
+- **Why density capping?** Without it, high-texture crater rims produce most matches and bias the fit while flat regions go unconstrained.
+- **Why warp XML products with a corner homography?** Raw pushbroom products carry no affine transform. Four-corner perspective warping is a light-weight approximation that brings them onto the metric grid without requiring a full sensor model.
+
+---
+
+## 13. Known Issues & Limitations
+
+- `__main__` in `run_pipeline.py` parses `--out-dir` and `--is-iirs` but passes hard-coded values (`"output"`, `False`) to `run_pipeline()`; call the Python API directly to use them.
+- `extract_and_filter_patches` is a generator, so the `if not tiles` empty-check in `run_pipeline.py` never fires; an empty result surfaces later as "No matches survived fusion".
+- The default `solar_incidence_deg=69.0` falls in the neutral 40°–70° band, so fusion weights are effectively 1.0 / 1.0 until set explicitly.
+- RIFT-2 (`1 − d₁/d₂`) and LoFTR (`mconf`) confidences are not calibrated to one another; thresholds are empirical.
+- Footprint intersection assumes a single `Polygon` result (`intersection.exterior`); multi-part intersections are not handled.
+- Stereographic pixel mapping for GeoTIFFs assumes the raster is in the same polar stereographic frame as the footprint math.
+- The corner-based perspective warp for XML products does not model terrain or sensor geometry (no SPICE/RPC).
+- Piecewise blending warps the full source image once per tile (`O(tiles × H × W)`), and the phase-congruency stage transfers the complex filter bank (~190 MiB per 1024² image) to host memory.
+- `cornerSubPix` assumes corner-like structure and refines each image independently; refined points are exported but not fed back into homography estimation.
+- Descriptor construction hard-codes 4 scales.
+
+---
+
+## 14. Roadmap
+
+- [ ] Unified confidence calibration across branches (e.g. isotonic mapping)
+- [ ] Adaptive, per-tile solar-incidence estimation from SPICE/metadata
+- [ ] Terrain-aware model using LOLA DEMs (RPC/DEM-based orthorectification instead of corner homography)
+- [ ] Incremental tile blending to cut memory and runtime
+- [ ] Refit homographies from sub-pixel points; joint sub-pixel matching
+- [ ] Benchmark suite with held-out control points and a public results table
+- [ ] Containerised environment (Docker) and CI smoke tests
+
+---
+
+## 15. References
+
+1. J. Li, Q. Hu, M. Ai. *RIFT: Multi-modal Image Matching Based on Radiation-variation Insensitive Feature Transform.* IEEE TIP, 2020.
+2. J. Li et al. *RIFT2: Speeding-up RIFT with a New Rotation-Invariance Technique.* arXiv, 2023.
+3. J. Sun, Z. Shen, Y. Wang, H. Bao, X. Zhou. *LoFTR: Detector-Free Local Feature Matching with Transformers.* CVPR, 2021.
+4. D. Barath, J. Noskova, M. Ivashechkin, J. Matas. *MAGSAC++, a Fast, Reliable and Accurate Robust Estimator.* CVPR, 2020.
+5. P. Kovesi. *Image Features from Phase Congruency.* Videre, 1999.
+6. K. Zuiderveld. *Contrast Limited Adaptive Histogram Equalization.* Graphics Gems IV, 1994.
+7. ISRO Chandrayaan-2 (TMC, OHRC, IIRS) PDS3 data products; NASA LRO LROC data.
+
+---
+
+## Team & License
+
+`<team members / mentor / institution>`
+
+Released under the `<license>` license. Third-party components (LoFTR, RIFT/RIFT-2 reference implementations) retain their respective licenses.
