@@ -1,4 +1,4 @@
-# Lunar Cross-Sensor Image Registration
+# SelenoMatch: Lunar Cross-Sensor Image Registration
 
 **A hybrid detector-free + radiation-invariant pipeline for co-registering Chandrayaan-2 and LRO optical imagery in South Polar Stereographic space.**
 
