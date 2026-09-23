@@ -59,19 +59,40 @@ This repository implements a **10-stage, fully in-memory pipeline** that takes t
 ## 3. System Architecture
 
 ```mermaid
-flowchart LR
-    A["Raw products<br/>ISRO XML (TMC/OHRC/IIRS)<br/>LRO GeoTIFF"] --> B["1 Metadata Parser"]
-    B --> C["2 Intersection Calculator<br/>(South Polar Stereographic)"]
-    C --> D["3 Geo-Sampler<br/>(shared metric grid)"]
-    D --> E["4 Preprocessor<br/>log → normalise → masked CLAHE"]
-    E --> F["5 Patch Extractor<br/>1024² macro-patches, stride 512"]
-    F --> G1["6a RIFT-2<br/>whole 1024² patch"]
-    F --> G2["6b LoFTR<br/>4 × 512² quadrants"]
-    G1 --> H["7 Match Fusion<br/>solar-weighted + grid cap"]
-    G2 --> H
-    H --> I["8 MAGSAC Verification<br/>global + piecewise"]
-    I --> J["9 Sub-pixel Refinement"]
-    J --> K["10 Visualisation<br/>+ summary.json"]
+flowchart TD
+    IN(["Raw products<br/>ISRO XML (TMC / OHRC / IIRS) · LRO GeoTIFF"])
+
+    subgraph GEO ["Geometry and sampling"]
+        direction TB
+        S1["1 · Metadata Parser"] --> S2["2 · Intersection Calculator<br/>South Polar Stereographic"]
+        S2 --> S3["3 · Geo-Sampler<br/>shared metric grid"]
+    end
+
+    subgraph PRE ["Preprocessing and tiling"]
+        direction TB
+        S4["4 · Optical Preprocessor<br/>log, normalise, masked CLAHE"] --> S5["5 · Patch Extractor<br/>1024x1024 macro-patches, stride 512"]
+    end
+
+    subgraph MATCH ["Dual-branch matching and fusion"]
+        direction TB
+        S6A["6a · RIFT-2<br/>whole 1024x1024 patch"]
+        S6B["6b · LoFTR<br/>4 x 512x512 quadrants"]
+        S7["7 · Match Fusion<br/>solar-weighted + grid cap"]
+        S6A --> S7
+        S6B --> S7
+    end
+
+    subgraph VER ["Verification and output"]
+        direction TB
+        S8["8 · MAGSAC Verification<br/>global + piecewise"] --> S9["9 · Sub-pixel Refinement"]
+        S9 --> S10["10 · Visualisation + summary.json"]
+    end
+
+    IN --> S1
+    S3 --> S4
+    S5 --> S6A
+    S5 --> S6B
+    S7 --> S8
 ```
 
 | # | Stage | Module | Responsibility |
