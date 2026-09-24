@@ -10,7 +10,7 @@
 
 ---
 
-## Table of Contents
+## Table of Contents 
 
 1. [Overview](#1-overview)
 2. [Highlights](#2-highlights)
@@ -430,21 +430,9 @@ All written to `--out-dir`:
 
 ---
 
-## 14. Roadmap
+## 14. References
 
-- [ ] Unified confidence calibration across branches (e.g. isotonic mapping)
-- [ ] Adaptive, per-tile solar-incidence estimation from SPICE/metadata
-- [ ] Terrain-aware model using LOLA DEMs (RPC/DEM-based orthorectification instead of corner homography)
-- [ ] Incremental tile blending to cut memory and runtime
-- [ ] Refit homographies from sub-pixel points; joint sub-pixel matching
-- [ ] Benchmark suite with held-out control points and a public results table
-- [ ] Containerised environment (Docker) and CI smoke tests
-
----
-
-## 15. References
-
-1. J. Li, Q. Hu, M. Ai. *RIFT: Multi-modal Image Matching Based on Radiation-variation Insensitive Feature Transform.* IEEE TIP, 2020.
+' . ! 1. J. Li, Q. Hu, M. Ai. *RIFT: Multi-modal Image Matching Based on Radiation-variation Insensitive Feature Transform.* IEEE TIP, 2020.
 2. J. Li et al. *RIFT2: Speeding-up RIFT with a New Rotation-Invariance Technique.* arXiv, 2023.
 3. J. Sun, Z. Shen, Y. Wang, H. Bao, X. Zhou. *LoFTR: Detector-Free Local Feature Matching with Transformers.* CVPR, 2021.
 4. D. Barath, J. Noskova, M. Ivashechkin, J. Matas. *MAGSAC++, a Fast, Reliable and Accurate Robust Estimator.* CVPR, 2020.
