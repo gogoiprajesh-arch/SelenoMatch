@@ -396,19 +396,21 @@ All written to `--out-dir`:
 - **Visual check:** the red/green overlay and tie-line figures.
 -
 ### Results
+| Reference product ID | Source product ID | Sensors | Inlier counts | Mean Inlier ratio | Median Inlier Ratio | Mean RMSE | Median RMSE |
+|----------------------|-------------------|---------|---------------|-------------------|---------------------|-----------|-------------|
+| `M170370297CC.tif` | `ch2_iir_nci_20210719T1622353775_d_img_d32.xml` | WAC ↔ IIRS | `481` | `0.9268` | `0.931` | `0.74` | `0.74` |
+| `ch2_ohr_ncp_20190906T2241285714_d_img_gds` | `ch2_ohr_ncp_20190907T0438126359_d_img_g26` | OHRC ↔ OHRC | `47412` | `0.636` | `0.873` | `1.58` | `1.59` |
+| `ch2_tmc_ncf_20231027T1711146475_d_img_d18` | `ch2_tmc_nrf_20231027T2107171839_d_img_d18` | TMC ↔ TMC | `` | `` | `` | `` | `` |
+| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` | `` |
+| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` | `` |
+| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` | `` |
+| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` | `` |
+| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` | `` |
 
-| Reference product ID | Source product ID | Sensors | Inlier counts | Inlier ratio | Mean RMSE | Median RMSE |
-|----------------------|-------------------|---------|---------------|--------------|-----------|-------------|
-| `M170370297CC.tif` | `ch2_iir_nci_20210719T1622353775_d_img_d32.xml` | LROC ↔ IIRS | `485` | `95.85` | `<...>` | `<...>` |
-| `ch2_ohr_ncp_20190906T2241285714_d_img_gds`  | `ch2_ohr_ncp_20190907T0438126359_d_img_g26` | OHRC ↔ OHRC | `` | `` | `` | `` |
-| `ch2_tmc_ncf_20231027T1711146475_d_img_d18` | `ch2_tmc_nrf_20231027T2107171839_d_img_d18` | TMC ↔ TMC | `` | `` | `` | `` |
-| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
-| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
-| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
-| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
-| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
 
-
+| Piecewise Visualization | Overlay Visualization |
+| :---: | :---: |
+| <img src="IMG_1464.png" width="450"> | <img src="IMG_1465.png" width="400"> |
 > Add representative `*_overlay.png` and `piecewise_visualization.png` figures here.
 
 ---
