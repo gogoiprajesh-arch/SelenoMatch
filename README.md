@@ -440,13 +440,15 @@ All written to `--out-dir`:
 
 ## 14. References
 
-' . ! 1. J. Li, Q. Hu, M. Ai. *RIFT: Multi-modal Image Matching Based on Radiation-variation Insensitive Feature Transform.* IEEE TIP, 2020.
-2. J. Li et al. *RIFT2: Speeding-up RIFT with a New Rotation-Invariance Technique.* arXiv, 2023.
-3. J. Sun, Z. Shen, Y. Wang, H. Bao, X. Zhou. *LoFTR: Detector-Free Local Feature Matching with Transformers.* CVPR, 2021.
-4. D. Barath, J. Noskova, M. Ivashechkin, J. Matas. *MAGSAC++, a Fast, Reliable and Accurate Robust Estimator.* CVPR, 2020.
-5. P. Kovesi. *Image Features from Phase Congruency.* Videre, 1999.
-6. K. Zuiderveld. *Contrast Limited Adaptive Histogram Equalization.* Graphics Gems IV, 1994.
-7. ISRO Chandrayaan-2 (TMC, OHRC, IIRS) PDS3 data products; NASA LRO LROC data.
+1. R. Makharia et al., "Comparative Evaluation of Traditional and Deep Learning Feature Matching Algorithms using Chandrayaan-2 Lunar Data."  
+2. G. Georgakis and A. Ansar, "Learning Illumination Invariant Features for Lunar South Pole with Deep Learning," in Space Imaging Workshop, Atlanta, GA, Oct. 2024  
+3. J. Sun, Z. Shen, Y. Wang, H. Bao, and X. Zhou, "LoFTR: Detector-Free Local Feature Matching with Transformers," in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), 2021, pp. 8922-8931.  
+4. J. Li, P. Shi, Y. Zhang, "RIFT2: Speeding-up RIFT with a New Rotation-Invariance Technique," IEEE TGRS, 2023.  
+5. M. A. Fischler, R. C. Bolles, "Random Sample Consensus," Communications of the ACM, 1981.  
+6. ISSDC — Chandrayaan-2 TMC-2, OHRC & IIRS PDS4 Product Specifications.  
+7. NASA PDS Imaging Node — LROC NAC Polar Stereographic Archive.  
+8. Rasterio & Shapely documentation — windowed chunk reading, geometry ops and polar-stereographic re-projection.  
+9. PyTorch (deep learning) and OpenCV (radiometric normalization & CLAHE) official documentation.
 
 ---
 
