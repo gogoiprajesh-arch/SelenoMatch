@@ -401,6 +401,13 @@ All written to `--out-dir`:
 | `<fill in>` | `<e.g. LRO NAC ↔ OHRC>` | `<…>` | `<…>` |
 
 > Add representative `*_overlay.png` and `piecewise_visualization.png` figures here.
+### Results
+
+| Reference product ID | Source product ID | Sensors | Inlier counts | Inlier ratio | Mean RMSE | Median RMSE |
+|----------------------|-------------------|---------|---------------|--------------|-----------|-------------|
+| `M170370297CC.tif` | `ch2_iir_nci_20210719T1622353775_d_img_d32.xml` | LROC ↔ IIRS | `485` | `95.85` | `<...>` | `<...>` |
+
+> Add representative `*_overlay.png` and `piecewise_visualization.png` figures here.
 
 ---
 
