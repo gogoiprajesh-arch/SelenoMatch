@@ -411,7 +411,6 @@ All written to `--out-dir`:
 | Piecewise Visualization | Overlay Visualization |
 | :---: | :---: |
 | <img src="IMG_1464.png" width="450"> | <img src="IMG_1465.png" width="400"> |
-> Add representative `*_overlay.png` and `piecewise_visualization.png` figures here.
 
 ---
 
