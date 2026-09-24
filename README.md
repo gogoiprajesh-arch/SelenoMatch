@@ -1,4 +1,4 @@
-# SelenoMatch: Lunar Cross-Sensor Image Registration
+# SelenoMatch: Lunar Cross-Sensor Image Registration 
 
 **A hybrid detector-free + radiation-invariant pipeline for co-registering Chandrayaan-2 and LRO optical imagery in South Polar Stereographic space.**
 
@@ -393,19 +393,20 @@ All written to `--out-dir`:
 - **RMSE (px)** = $\sqrt{\frac{1}{N}\sum_i \lVert H\,\mathbf{x}^{src}_i - \mathbf{x}^{ref}_i \rVert^2}$ over **inliers only**. Because it is computed on inliers, it reflects fit tightness and should be read together with the inlier ratio and the visual overlay. Multiply by `target_res` for metres.
 - **Per-source inlier breakdown** (RIFT-2 vs LoFTR) per tile, for ablation of the fusion strategy.
 - **Visual check:** the red/green overlay and tie-line figures.
-
-### Results
-
-| Scene pair | Sensors | Global inliers / RMSE | Piecewise tiles / median RMSE |
-|------------|---------|-----------------------|-------------------------------|
-| `<fill in>` | `<e.g. LRO NAC ↔ OHRC>` | `<…>` | `<…>` |
-
-> Add representative `*_overlay.png` and `piecewise_visualization.png` figures here.
+-
 ### Results
 
 | Reference product ID | Source product ID | Sensors | Inlier counts | Inlier ratio | Mean RMSE | Median RMSE |
 |----------------------|-------------------|---------|---------------|--------------|-----------|-------------|
 | `M170370297CC.tif` | `ch2_iir_nci_20210719T1622353775_d_img_d32.xml` | LROC ↔ IIRS | `485` | `95.85` | `<...>` | `<...>` |
+| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
+| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
+| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
+| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
+| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
+| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
+| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
+
 
 > Add representative `*_overlay.png` and `piecewise_visualization.png` figures here.
 
