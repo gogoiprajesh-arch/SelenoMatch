@@ -127,7 +127,8 @@ Each footprint is mapped to **South Polar Stereographic** metres on a sphere of 
 
 $$\rho = 2R\tan\!\left(\frac{\pi}{4} + \frac{\varphi}{2}\right),\qquad x = \rho\sin\lambda,\qquad y = \rho\cos\lambda$$
 
-with the inverse $\varphi = 2\arctan\!\left(\frac{\rho}{2R}\right) - \frac{\pi}{2}$, $\lambda = \operatorname{atan2}(x, y) \bmod 360^\circ$.
+with the inverse $\varphi = 2\arctan\!\left(\frac{\rho}{2R}\right) - \frac{\pi}{2}$, $\lambda = \text{atan2}(x, y) \text{ mod } 360^\circ$
+
 
 The two footprints become Shapely polygons and are intersected. The intersection is then projected **independently back into each image's pixel space**:
 
