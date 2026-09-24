@@ -400,8 +400,8 @@ All written to `--out-dir`:
 | Reference product ID | Source product ID | Sensors | Inlier counts | Inlier ratio | Mean RMSE | Median RMSE |
 |----------------------|-------------------|---------|---------------|--------------|-----------|-------------|
 | `M170370297CC.tif` | `ch2_iir_nci_20210719T1622353775_d_img_d32.xml` | LROC ↔ IIRS | `485` | `95.85` | `<...>` | `<...>` |
-| `ch2_iir_nci_20210719T1622353775_d_img_d32.xml` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
-| `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
+| `ch2_ohr_ncp_20190906T2241285714_d_img_gds`  | `ch2_ohr_ncp_20190907T0438126359_d_img_g26` | OHRC ↔ OHRC | `` | `` | `` | `` |
+| `ch2_tmc_ncf_20231027T1711146475_d_img_d18` | `ch2_tmc_nrf_20231027T2107171839_d_img_d18` | TMC ↔ TMC | `` | `` | `` | `` |
 | `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
 | `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
 | `` | `` | LROC ↔ IIRS | `` | `` | `` | `` |
