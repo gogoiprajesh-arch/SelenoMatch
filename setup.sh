@@ -13,11 +13,10 @@ fi
 # 2. Create the weights directory
 mkdir -p LoFTR/weights
 
-# 3. Download the weights directly from your GitHub release
 if [ ! -f "LoFTR/weights/outdoor_ds.ckpt" ]; then
     echo "[INFO] Downloading outdoor_ds.ckpt..."
-    # REPLACE THE LINK BELOW WITH YOUR GITHUB RELEASE LINK
-    wget -O LoFTR/weights/outdoor_ds.ckpt "https://github.com/gogoiprajesh-arch/SelenoMatch/releases/download/..."
+    
+    wget -O LoFTR/weights/outdoor_ds.ckpt "https://github.com/gogoiprajesh-arch/SelenoMatch/releases/download/v1.0-weights/outdoor_ds.ckpt"
 else
     echo "[OK] LoFTR weights already downloaded."
 fi
