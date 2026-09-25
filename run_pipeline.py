@@ -87,8 +87,8 @@ def run_pipeline(ref_path, src_path, loftr_repo_dir, loftr_weights, out_dir="out
          
         if raw_ref.size > 0 and raw_src.size > 0:
             # 1. Align with max(res1, res2) by finding the smaller array's native bounds
-            target_h = min(raw_ref.shape[0], raw_src.shape[0])
-            target_w = min(raw_ref.shape[1], raw_src.shape[1])
+            target_h = max(raw_ref.shape[0], raw_src.shape[0])
+            target_w = min(max(raw_ref.shape[1], raw_src.shape[1]),5000)
             
             # 2. Resize safely down to that exact physical intersection using INTER_AREA
             raw_ref = cv2.resize(raw_ref, (target_w, target_h), interpolation=cv2.INTER_AREA)
