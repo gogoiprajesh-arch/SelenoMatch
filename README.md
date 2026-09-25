@@ -299,6 +299,18 @@ This pipeline expects pre-processed `.tif` (GeoTIFF) or `.xml` (PDS3/PDS4) files
 
 ## 8. Usage
 
+### Quickstart Demo (Recommended for Evaluation)
+To instantly test the pipeline without downloading raw gigabyte-scale planetary data, run the core matching engine on the provided CLAHE-enhanced sample pair:
+
+**For Linux / macOS / WSL:**
+```bash
+bash run_demo.sh
+```
+
+**For Windows (CMD / PowerShell):**
+```bash
+.\run_demo.bat
+```
 
 ### CLI
 
