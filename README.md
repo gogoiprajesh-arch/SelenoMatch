@@ -8,10 +8,14 @@
 
 > Problem Statement ID: `<SIH26166>` · Team: `<SelenoMatch>`
 
+<p align="center">
+  <img src="IMG_1465.png" width="400">
+  <img src="IMG_1464.png" width="450">
+</p>
+
 ---
 
 ## Table of Contents
-
 1. [Overview](#1-overview)
 2. [Highlights](#2-highlights)
 3. [System Architecture](#3-system-architecture)
@@ -292,7 +296,6 @@ git clone https://github.com/zju3dv/LoFTR.git
 
 ## 8. Usage
 
-## 8. Usage
 
 ### CLI
 
@@ -393,7 +396,7 @@ All written to `--out-dir`:
 - **RMSE (px)** = $\sqrt{\frac{1}{N}\sum_i \lVert H\,\mathbf{x}^{src}_i - \mathbf{x}^{ref}_i \rVert^2}$ over **inliers only**. Because it is computed on inliers, it reflects fit tightness and should be read together with the inlier ratio and the visual overlay. Multiply by `target_res` for metres.
 - **Per-source inlier breakdown** (RIFT-2 vs LoFTR) per tile, for ablation of the fusion strategy.
 - **Visual check:** the red/green overlay and tie-line figures.
--
+
 ### Results
 | Reference product ID | Source product ID | Sensors | Inlier counts | Mean Inlier ratio | Median Inlier Ratio | Mean RMSE | Median RMSE |
 |----------------------|-------------------|---------|---------------|-------------------|---------------------|-----------|-------------|
