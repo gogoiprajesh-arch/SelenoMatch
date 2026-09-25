@@ -278,9 +278,15 @@ Point arrays are always `(x, y)` = `(col, row)`; patch offsets are `(y_off, x_of
 git clone [https://github.com/gogoiprajesh-arch/SelenoMatch.git](https://github.com/gogoiprajesh-arch/SelenoMatch.git)
 cd SelenoMatch
 
-# Create a clean virtual environment (using venv or conda)
+# Create a clean virtual environment
 python -m venv lunar-reg
-source lunar-reg/bin/activate  # On Windows use: lunar-reg\Scripts\activate
+
+# Activate on Linux/macOS (Bash/Zsh):
+source lunar-reg/bin/activate  
+
+# Activate on Windows (PowerShell):
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\lunar-reg\Scripts\Activate.ps1
 
 # Install pipeline and frontend dependencies
 pip install -r requirements.txt
@@ -289,8 +295,13 @@ pip install -r requirements.txt
 # pip install torch torchvision --index-url [https://download.pytorch.org/whl/cu121](https://download.pytorch.org/whl/cu121)
 
 # Run automated setup to clone LoFTR and download the pre-trained weights
+# For Linux / macOS / WSL:
 bash setup.sh
+
+# For Windows (CMD / PowerShell):
+.\setup.bat
 ```
+
 ### Note on Data Preparation (USGS ISIS)
 
 This pipeline expects pre-processed `.tif` (GeoTIFF) or `.xml` (PDS3/PDS4) files. If you are downloading raw `.img` files (e.g., from the LRO PDS node), you will need to convert them to GeoTIFFs first. Our workflow utilizes [USGS ISIS](https://github.com/USGS-Astrogeology/ISIS3) via a separate Conda environment to ingest and export these raster files prior to running the SelenoMatch pipeline.
