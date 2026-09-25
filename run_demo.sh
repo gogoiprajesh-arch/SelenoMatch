@@ -6,8 +6,8 @@ echo "[SelenoMatch] Bypassing spatial ingestion to run core matching engine on p
 mkdir -p demo_output
 
 python demo_only.py \
-    --ref-img processed/pair_2/reference_processed.png \
-    --src-img processed/pair_2/source_processed.png \
+    --ref-img sample_dataset/reference_clahe.png \
+    --src-img sample_dataset/source_clahe.png \
     --out-dir demo_output
 
 echo "[SelenoMatch] Demo complete! Check 'demo_output' for tie-line visualizations and metrics."
