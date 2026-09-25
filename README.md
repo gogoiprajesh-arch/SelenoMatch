@@ -317,6 +317,8 @@ python run_pipeline.py \
 | `--out-dir` | Output directory |
 | `--is-iirs` | Treat the source XML as an IIRS cube (band 40–60 mean) |
 
+*Note: While a prototype Streamlit web interface is included in the repository for internal visualization, this CLI is the official, supported method for evaluating the SelenoMatch pipeline.*
+
 ### Python API
 
 ```python
