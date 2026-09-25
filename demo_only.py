@@ -87,8 +87,8 @@ def test_processed_pair(ref_png_path, src_png_path, out_dir="test_output"):
         all_conf = np.concatenate([t["conf"] for t in tile_matches])
         all_source = np.concatenate([t["source"] for t in tile_matches])
         
-        all_pts_ref, all_pts_src, all_conf, all_source = enforce_uniform_distribution(
-            all_pts_ref, all_pts_src, all_conf, all_source, img_ref.shape, grid_size=(10, 10), max_per_cell=15
+        all_pts_ref, all_pts_src, all_conf = enforce_uniform_distribution(
+            all_pts_ref, all_pts_src, all_conf, img_ref.shape, grid_size=10, max_per_cell=15
         )
         
         evaluate_global(
