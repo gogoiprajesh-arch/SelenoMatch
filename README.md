@@ -271,26 +271,29 @@ Point arrays are always `(x, y)` = `(col, row)`; patch offsets are `(y_off, x_of
 
 ## 7. Installation
 
-**Requirements:** Python ≥ 3.9, a CUDA-capable GPU (strongly recommended; both branches fall back to CPU but are slow), OpenCV ≥ 4.5 (needed for `cv2.USAC_MAGSAC`).
+
+**Requirements:** Python ≥ 3.9, a CUDA-capable GPU (strongly recommended), and OpenCV ≥ 4.5. 
 
 ```bash
-git clone <this-repo> && cd <this-repo>
+git clone [https://github.com/gogoiprajesh-arch/SelenoMatch.git](https://github.com/gogoiprajesh-arch/SelenoMatch.git)
+cd SelenoMatch
 
-conda create -n lunar-reg python=3.10 -y
-conda activate lunar-reg
+# Create a clean virtual environment (using venv or conda)
+python -m venv lunar-reg
+source lunar-reg/bin/activate  # On Windows use: lunar-reg\Scripts\activate
 
-# rasterio/GDAL and shapely are easiest via conda-forge
-conda install -c conda-forge rasterio shapely -y
+# Install pipeline and frontend dependencies
+pip install -r requirements.txt
 
-pip install torch torchvision                  # pick the CUDA build for your system
-pip install numpy opencv-python pyyaml joblib tqdm matplotlib
+# Note: requirements.txt installs default PyTorch. For GPU acceleration:
+# pip install torch torchvision --index-url [https://download.pytorch.org/whl/cu121](https://download.pytorch.org/whl/cu121)
 
-# LoFTR (external dependency, cloned next to run_pipeline.py)
-git clone https://github.com/zju3dv/LoFTR.git
-# install LoFTR's own dependencies (see LoFTR/environment.yaml), then place the
-# outdoor checkpoint at:
-#   ./LoFTR/weights/outdoor_ds.ckpt
+# Run automated setup to clone LoFTR and download the pre-trained weights
+bash setup.sh
 ```
+### Note on Data Preparation (USGS ISIS)
+
+This pipeline expects pre-processed `.tif` (GeoTIFF) or `.xml` (PDS3/PDS4) files. If you are downloading raw `.img` files (e.g., from the LRO PDS node), you will need to convert them to GeoTIFFs first. Our workflow utilizes [USGS ISIS](https://github.com/USGS-Astrogeology/ISIS3) via a separate Conda environment to ingest and export these raster files prior to running the SelenoMatch pipeline.
 
 ---
 
