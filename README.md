@@ -9,8 +9,8 @@
 > Problem Statement ID: `<SIH26166>` · Team: `<SelenoMatch>`
 
 <p align="center">
-  <img src="IMG_1465.png" width="400">
-  <img src="IMG_1464.png" width="450">
+  <img src="piecewise_visualization.png" width="450">
+  <img src="global_overlay.png" width="350">
 </p>
 
 ---
@@ -440,7 +440,7 @@ All written to `--out-dir`:
 
 | Piecewise Visualization | Overlay Visualization |
 | :---: | :---: |
-| <img src="IMG_1464.png" width="450"> | <img src="IMG_1465.png" width="400"> |
+| <img src="piecewise_visualization.png" width="450"> | <img src="global_overlay.png" width="400"> |
 
 ---
 
